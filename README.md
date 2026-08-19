@@ -40,3 +40,13 @@ The app includes 192x192 and 512x512 PNG icons and a manifest suitable for brows
 - Updated the service-worker cache to include all manifest assets.
 
 If GitHub Pages still reports an icon as failed to load, open the exact icon URL directly in the browser. The file must return HTTP 200 and an image content type; after replacing the repository files, wait for GitHub Pages/CDN propagation and refresh the manifest/application tab.
+
+
+## V8 asset structure
+The PWA now follows the same proven structure as the existing Excel Record Viewer:
+- `assets/icons/icon-192.png`
+- `assets/icons/icon-512.png`
+- `assets/screenshots/desktop-wide.png`
+- `assets/screenshots/mobile.png`
+
+The manifest uses absolute GitHub Pages HTTPS URLs for these assets.
