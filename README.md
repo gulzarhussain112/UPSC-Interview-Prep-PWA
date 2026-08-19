@@ -29,3 +29,14 @@ Use either:
 2. localhost — for local testing, e.g. `python -m http.server 8080`, then open `http://localhost:8080/`.
 
 The app includes 192x192 and 512x512 PNG icons and a manifest suitable for browser installation.
+
+
+## V7 PWA manifest audit fixes
+- Added manifest `id` matching `/UPSC-Interview-Prep-PWA/`.
+- Added square 192px and 512px PNG icons with `any` and `maskable` purposes.
+- Added desktop `wide` and mobile screenshots for richer install UI.
+- Added `display_override`.
+- Added a `web+upscprep` protocol handler.
+- Updated the service-worker cache to include all manifest assets.
+
+If GitHub Pages still reports an icon as failed to load, open the exact icon URL directly in the browser. The file must return HTTP 200 and an image content type; after replacing the repository files, wait for GitHub Pages/CDN propagation and refresh the manifest/application tab.

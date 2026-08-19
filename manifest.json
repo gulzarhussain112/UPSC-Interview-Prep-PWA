@@ -1,1 +1,63 @@
-{"name":"UPSC Scientific Officer Interview Prep","short_name":"UPSC Prep","start_url":"./","scope":"./","display":"standalone","background_color":"#06101d","theme_color":"#07101d","orientation":"portrait-primary","icons":[{"src":"icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{
+  "id": "/UPSC-Interview-Prep-PWA/",
+  "name": "UPSC Scientific Officer Interview Prep",
+  "short_name": "UPSC Prep",
+  "description": "Personal timetable, topic checklist and UPSC ORA interview preparation tracker.",
+  "start_url": "/UPSC-Interview-Prep-PWA/",
+  "scope": "/UPSC-Interview-Prep-PWA/",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "display": "standalone",
+  "background_color": "#06101d",
+  "theme_color": "#07101d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/desktop-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Live study dashboard on desktop"
+    },
+    {
+      "src": "screenshots/mobile.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "label": "Live study dashboard on mobile"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+upscprep",
+      "url": "/UPSC-Interview-Prep-PWA/?topic=%s"
+    }
+  ]
+}
