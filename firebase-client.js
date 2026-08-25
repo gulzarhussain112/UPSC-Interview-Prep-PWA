@@ -1,60 +1,25 @@
-(function () {
+(function(){
 
-  'use strict';
+  const cfg =
+    window.UPSC_FIREBASE_CONFIG || {};
 
-
-  /* =========================================================
-     CONFIGURATION
-     ========================================================= */
-
-  const cfg = window.UPSC_FIREBASE_CONFIG || {};
 
   const configured =
-    !!(
-      cfg.apiKey &&
-      cfg.projectId &&
-      cfg.appId &&
-      cfg.vapidKey &&
-      !String(cfg.apiKey).startsWith('PASTE_') &&
-      !String(cfg.vapidKey).startsWith('PASTE_')
-    );
+    cfg.apiKey &&
+    cfg.projectId &&
+    cfg.appId &&
+    cfg.vapidKey &&
+    !String(cfg.apiKey).startsWith('PASTE_') &&
+    !String(cfg.vapidKey).startsWith('PASTE_');
 
 
   let messaging = null;
   let db = null;
   let user = null;
   let token = null;
-  let messagingRegistration = null;
 
 
-  const ENABLE_TIMEOUT = 30000;
-
-
-  /* =========================================================
-     HELPERS
-     ========================================================= */
-
-  function log(step, ...args) {
-
-    console.log(
-      `[StudyPush] ${step}`,
-      ...args
-    );
-
-  }
-
-
-  function warn(step, ...args) {
-
-    console.warn(
-      `[StudyPush] ${step}`,
-      ...args
-    );
-
-  }
-
-
-  function setState(state) {
+  function setState(state){
 
     window.dispatchEvent(
       new CustomEvent(
@@ -68,122 +33,64 @@
   }
 
 
-  function timeout(promise, ms, message) {
+  /*
+  =========================================================
+   NOT CONFIGURED
+  =========================================================
+  */
 
-    return Promise.race([
-
-      promise,
-
-      new Promise((_, reject) => {
-
-        setTimeout(() => {
-
-          reject(
-            new Error(message)
-          );
-
-        }, ms);
-
-      })
-
-    ]);
-
-  }
-
-
-  function getServiceWorkerUrl() {
-
-    /*
-      This is important for GitHub Pages.
-
-      If the application is running at:
-
-      /UPSC-Interview-Prep-PWA/
-
-      the browser gets:
-
-      /UPSC-Interview-Prep-PWA/firebase-messaging-sw.js
-    */
-
-    return new URL(
-      'firebase-messaging-sw.js',
-      window.location.href
-    ).href;
-
-  }
-
-
-  /* =========================================================
-     NOT CONFIGURED
-     ========================================================= */
-
-  if (!configured) {
+  if(!configured){
 
     window.StudyPush = {
 
-      isEnabled: () => false,
+      isEnabled:
+        () => false,
 
-      isConfigured: () => false,
+      isConfigured:
+        () => false,
 
-      enable: async () => {
+      enable:
+        async () => {
 
-        throw new Error(
-          'Firebase is not configured yet. Add your Firebase web config and Web Push VAPID key to firebase-config.js.'
-        );
+          throw new Error(
+            'Firebase is not configured. Check firebase-config.js.'
+          );
 
-      },
+        },
 
-      syncProgress: async () => {},
+      syncProgress:
+        async () => {},
 
-      ackSession: async () => {},
+      ackSession:
+        async () => {},
 
-      disable: async () => {}
+      disable:
+        async () => {}
 
     };
 
-    setState('not-configured');
+
+    setState(
+      'not-configured'
+    );
 
     return;
 
   }
 
 
-  /* =========================================================
-     FIREBASE INITIALIZATION
-     ========================================================= */
+  /*
+  =========================================================
+   FIREBASE INITIALIZATION
+  =========================================================
+  */
 
-  try {
+  try{
 
-    log(
-      'INIT',
-      'Starting Firebase initialization'
-    );
+    if(!firebase.apps.length){
 
-
-    if (!window.firebase) {
-
-      throw new Error(
-        'Firebase JavaScript SDK is not loaded.'
-      );
-
-    }
-
-
-    if (!firebase.apps.length) {
-
-      log(
-        'INIT',
-        'Initializing Firebase'
-      );
-
-      firebase.initializeApp(cfg);
-
-    }
-    else {
-
-      log(
-        'INIT',
-        'Firebase app already initialized'
+      firebase.initializeApp(
+        cfg
       );
 
     }
@@ -192,84 +99,37 @@
     db =
       firebase.firestore();
 
+
     messaging =
       firebase.messaging();
 
 
-    log(
-      'INIT',
-      'Firebase Messaging initialized'
-    );
+    /*
+    =======================================================
+     ENSURE ANONYMOUS USER
+    =======================================================
+    */
 
+    async function ensureUser(){
 
-    /* =======================================================
-       ANONYMOUS USER
-       ======================================================= */
-
-    async function ensureUser() {
-
-      if (user) {
+      if(user){
 
         return user;
 
       }
-
-
-      log(
-        'AUTH',
-        'Checking Firebase authentication'
-      );
-
-
-      const currentUser =
-        firebase.auth().currentUser;
-
-
-      if (currentUser) {
-
-        user = currentUser;
-
-        log(
-          'AUTH',
-          'Existing Firebase user:',
-          user.uid
-        );
-
-        return user;
-
-      }
-
-
-      log(
-        'AUTH',
-        'Signing in anonymously...'
-      );
 
 
       const result =
-        await timeout(
-          firebase.auth().signInAnonymously(),
-          ENABLE_TIMEOUT,
-          'Firebase anonymous sign-in timed out.'
-        );
+        await firebase.auth()
+          .signInAnonymously();
 
 
       user =
         result.user;
 
 
-      if (!user) {
-
-        throw new Error(
-          'Firebase anonymous sign-in returned no user.'
-        );
-
-      }
-
-
-      log(
-        'AUTH',
-        'Anonymous user ready:',
+      console.log(
+        '[StudyPush] Firebase user:',
         user.uid
       );
 
@@ -279,329 +139,128 @@
     }
 
 
-    /* =======================================================
-       SAVE FCM TOKEN
-       ======================================================= */
+    /*
+    =======================================================
+     REMOVE OLD FIREBASE MESSAGING SW
+    =======================================================
+    */
 
-    async function saveToken(t) {
+    async function removeOldMessagingWorker(){
 
-      if (!t) {
+      if(
+        !navigator.serviceWorker ||
+        !navigator.serviceWorker.getRegistrations
+      ){
 
-        throw new Error(
-          'Cannot save an empty FCM token.'
-        );
+        return;
 
       }
 
 
-      const u =
-        await ensureUser();
+      const registrations =
+        await navigator.serviceWorker
+          .getRegistrations();
 
 
-      token = t;
+      for(
+        const registration
+        of registrations
+      ){
+
+        const scriptURL =
+          registration.active?.scriptURL ||
+          registration.waiting?.scriptURL ||
+          registration.installing?.scriptURL ||
+          '';
 
 
-      const timezone =
-        Intl.DateTimeFormat()
-          .resolvedOptions()
-          .timeZone ||
-        'UTC';
+        if(
+          scriptURL.includes(
+            'firebase-messaging-sw.js'
+          )
+        ){
+
+          console.log(
+            '[StudyPush] Removing old Firebase messaging service worker'
+          );
 
 
-      log(
-        'FIRESTORE',
-        'Saving FCM token for user:',
-        u.uid
-      );
+          await registration.unregister();
 
+        }
 
-      await timeout(
-
-        db
-          .collection('users')
-          .doc(u.uid)
-          .set({
-
-            fcmToken: t,
-
-            timezone: timezone,
-
-            enabled: true,
-
-            notificationFrequencyMinutes: 30,
-
-            strictMode: true,
-
-            updatedAt:
-              firebase.firestore.FieldValue
-                .serverTimestamp()
-
-          }, {
-
-            merge: true
-
-          }),
-
-        ENABLE_TIMEOUT,
-
-        'Saving the notification token to Firestore timed out.'
-
-      );
-
-
-      /*
-        Only mark the device enabled AFTER Firestore
-        successfully accepts the token.
-      */
-
-      localStorage.setItem(
-        'upsc_push_enabled',
-        '1'
-      );
-
-
-      log(
-        'FIRESTORE',
-        'FCM TOKEN SAVED successfully'
-      );
-
-
-      log(
-        'FIRESTORE',
-        'User UID:',
-        u.uid
-      );
-
-
-      setState('enabled');
+      }
 
     }
 
 
-    /* =======================================================
-       GET / REGISTER MESSAGING SERVICE WORKER
-       ======================================================= */
+    /*
+    =======================================================
+     ENSURE OUR MAIN SERVICE WORKER
+    =======================================================
+    */
 
-    async function getMessagingServiceWorker() {
+    async function getServiceWorker(){
 
-      if (
-        !('serviceWorker' in navigator)
-      ) {
-
-        throw new Error(
-          'This browser does not support Service Workers.'
-        );
-
-      }
-
-
-      const swUrl =
-        getServiceWorkerUrl();
-
-
-      log(
-        'SW',
-        'Messaging Service Worker URL:',
-        swUrl
-      );
+      await removeOldMessagingWorker();
 
 
       /*
-        Explicit registration is much safer than simply using
-        navigator.serviceWorker.ready.
-
-        It guarantees that Firebase Messaging gets the exact
-        Service Worker we expect.
+      Register the ONE service worker used
+      by the entire PWA.
       */
 
-      log(
-        'SW',
-        'Registering firebase-messaging-sw.js...'
-      );
-
-
-      let registration;
-
-
-      try {
-
-        registration =
-          await timeout(
-
-            navigator.serviceWorker.register(
-              swUrl,
-              {
-                scope:
-                  new URL(
-                    './',
-                    window.location.href
-                  ).pathname
-              }
-            ),
-
-            ENABLE_TIMEOUT,
-
-            'Service Worker registration timed out.'
-
-          );
-
-      }
-      catch (e) {
-
-        console.error(
-          '[StudyPush] SERVICE WORKER REGISTRATION FAILED',
-          e
+      const registration =
+        await navigator.serviceWorker.register(
+          './service-worker.js',
+          {
+            scope: './'
+          }
         );
 
 
-        throw new Error(
-          'Firebase Messaging Service Worker could not be registered. ' +
-          'Open DevTools Console and look for [StudyPush] SW errors. ' +
-          'Original error: ' +
-          (e.message || e)
-        );
-
-      }
-
-
-      messagingRegistration =
-        registration;
-
-
-      log(
-        'SW',
-        'Registration created:',
+      console.log(
+        '[StudyPush] Service worker registered:',
         registration.scope
       );
 
 
       /*
-        Check registration state.
+      Wait until it becomes active.
       */
 
-      log(
-        'SW',
-        'Installing:',
-        !!registration.installing
-      );
-
-      log(
-        'SW',
-        'Waiting:',
-        !!registration.waiting
-      );
-
-      log(
-        'SW',
-        'Active:',
-        !!registration.active
-      );
-
-
-      /*
-        If the worker is installing, wait until it becomes active.
-      */
-
-      if (
+      if(
         registration.installing
-      ) {
+      ){
 
-        log(
-          'SW',
-          'Service Worker is installing...'
-        );
+        await new Promise(resolve => {
 
-
-        await timeout(
-
-          new Promise((resolve, reject) => {
-
-            const worker =
-              registration.installing;
-
-
-            const checkState = () => {
-
-              log(
-                'SW',
-                'Worker state:',
-                worker.state
-              );
-
-
-              if (
-                worker.state === 'activated'
-              ) {
-
-                resolve();
-
-              }
-
-
-              if (
-                worker.state === 'redundant'
-              ) {
-
-                reject(
-                  new Error(
-                    'Firebase Messaging Service Worker became redundant.'
-                  )
-                );
-
-              }
-
-            };
-
-
-            worker.addEventListener(
+          registration.installing
+            .addEventListener(
               'statechange',
-              checkState
+              function(){
+
+                if(
+                  this.state === 'activated'
+                ){
+
+                  resolve();
+
+                }
+
+              }
             );
 
-
-            checkState();
-
-          }),
-
-          ENABLE_TIMEOUT,
-
-          'Firebase Messaging Service Worker did not become active in time.'
-
-        );
+        });
 
       }
 
 
-      /*
-        If waiting, activate it if possible.
-      */
-
-      if (
-        registration.waiting &&
-        navigator.serviceWorker.controller
-      ) {
-
-        log(
-          'SW',
-          'A waiting Service Worker exists.'
-        );
-
-      }
+      await navigator.serviceWorker.ready;
 
 
-      if (!registration.active) {
-
-        throw new Error(
-          'Firebase Messaging Service Worker registered but has no active worker.'
-        );
-
-      }
-
-
-      log(
-        'SW',
-        'Service Worker ACTIVE:',
-        registration.active.scriptURL
+      console.log(
+        '[StudyPush] Service worker ready'
       );
 
 
@@ -610,65 +269,121 @@
     }
 
 
-    /* =======================================================
-       PUBLIC API
-       ======================================================= */
+    /*
+    =======================================================
+     SAVE TOKEN
+    =======================================================
+    */
+
+    async function saveToken(t){
+
+      const u =
+        await ensureUser();
+
+
+      token =
+        t;
+
+
+      await db
+        .collection('users')
+        .doc(u.uid)
+        .set({
+
+          fcmToken:
+            t,
+
+          timezone:
+            Intl.DateTimeFormat()
+              .resolvedOptions()
+              .timeZone,
+
+          enabled:
+            true,
+
+          notificationFrequencyMinutes:
+            30,
+
+          strictMode:
+            true,
+
+          updatedAt:
+            firebase.firestore
+              .FieldValue
+              .serverTimestamp()
+
+        }, {
+
+          merge:
+            true
+
+        });
+
+
+      localStorage.setItem(
+        'upsc_push_enabled',
+        '1'
+      );
+
+
+      console.log(
+        '[StudyPush] FCM TOKEN SAVED'
+      );
+
+
+      console.log(
+        '[StudyPush] UID:',
+        u.uid
+      );
+
+
+      setState(
+        'enabled'
+      );
+
+    }
+
+
+    /*
+    =========================================================
+     PUBLIC API
+    =========================================================
+    */
 
     window.StudyPush = {
 
-      /* -----------------------------------------------------
-         ENABLED STATE
-         ----------------------------------------------------- */
+      isEnabled:
+        () => {
 
-      isEnabled: () => {
+          return !!token ||
+            localStorage.getItem(
+              'upsc_push_enabled'
+            ) === '1';
 
-        return !!token ||
-          localStorage.getItem(
-            'upsc_push_enabled'
-          ) === '1';
-
-      },
+        },
 
 
-      /* -----------------------------------------------------
-         CONFIGURED
-         ----------------------------------------------------- */
-
-      isConfigured: () => true,
+      isConfigured:
+        () => true,
 
 
-      /* =====================================================
-         ENABLE NOTIFICATIONS
-         ===================================================== */
+      /*
+      =======================================================
+       ENABLE NOTIFICATIONS
+      =======================================================
+      */
 
-      enable: async () => {
+      enable:
+        async () => {
 
-        log(
-          'ENABLE',
-          '========================================'
-        );
-
-        log(
-          'ENABLE',
-          'STARTING NOTIFICATION SETUP'
-        );
-
-
-        try {
-
-          /* -----------------------------------------------
-             STEP 1 — Browser support
-             ----------------------------------------------- */
-
-          log(
-            'STEP 1',
-            'Checking browser notification support...'
+          console.log(
+            '[StudyPush] Starting notification setup...'
           );
 
 
-          if (
+          if(
             !('Notification' in window)
-          ) {
+          ){
 
             throw new Error(
               'This browser does not support notifications.'
@@ -677,30 +392,25 @@
           }
 
 
-          if (
+          if(
             !('serviceWorker' in navigator)
-          ) {
+          ){
 
             throw new Error(
-              'This browser does not support Service Workers.'
+              'This browser does not support service workers.'
             );
 
           }
 
 
-          log(
-            'STEP 1',
-            'Browser support OK'
-          );
+          /*
+          -----------------------------------------------
+           Permission
+          -----------------------------------------------
+          */
 
-
-          /* -----------------------------------------------
-             STEP 2 — Permission
-             ----------------------------------------------- */
-
-          log(
-            'STEP 2',
-            'Current notification permission:',
+          console.log(
+            '[StudyPush] Current permission:',
             Notification.permission
           );
 
@@ -709,171 +419,123 @@
             Notification.permission;
 
 
-          if (
+          if(
             permission !== 'granted'
-          ) {
-
-            log(
-              'STEP 2',
-              'Requesting notification permission...'
-            );
-
+          ){
 
             permission =
-              await timeout(
-
-                Notification.requestPermission(),
-
-                ENABLE_TIMEOUT,
-
-                'Notification permission request timed out.'
-
-              );
+              await Notification.requestPermission();
 
           }
 
 
-          log(
-            'STEP 2',
-            'Permission result:',
+          console.log(
+            '[StudyPush] Permission:',
             permission
           );
 
 
-          if (
+          if(
             permission !== 'granted'
-          ) {
+          ){
 
             throw new Error(
-              'Notification permission was not granted. Current permission: ' +
-              permission
+              'Notification permission was not granted.'
             );
 
           }
 
 
-          /* -----------------------------------------------
-             STEP 3 — Firebase authentication
-             ----------------------------------------------- */
-
-          log(
-            'STEP 3',
-            'Preparing Firebase user...'
-          );
-
+          /*
+          -----------------------------------------------
+           Firebase user
+          -----------------------------------------------
+          */
 
           const u =
             await ensureUser();
 
 
-          log(
-            'STEP 3',
-            'Firebase user ready:',
+          console.log(
+            '[StudyPush] Using Firebase user:',
             u.uid
           );
 
 
-          /* -----------------------------------------------
-             STEP 4 — Service Worker
-             ----------------------------------------------- */
-
-          log(
-            'STEP 4',
-            'Preparing Firebase Messaging Service Worker...'
-          );
-
+          /*
+          -----------------------------------------------
+           ONE service worker
+          -----------------------------------------------
+          */
 
           const registration =
-            await getMessagingServiceWorker();
+            await getServiceWorker();
 
 
-          log(
-            'STEP 4',
-            'Messaging Service Worker ready'
+          console.log(
+            '[StudyPush] SW ready:',
+            registration.scope
           );
 
 
-          /* -----------------------------------------------
-             STEP 5 — FCM token
-             ----------------------------------------------- */
+          /*
+          -----------------------------------------------
+           FCM token
+          -----------------------------------------------
+          */
 
-          log(
-            'STEP 5',
-            'Requesting FCM registration token...'
+          console.log(
+            '[StudyPush] Requesting FCM token...'
           );
 
 
-          if (!messaging) {
+          const t =
+            await messaging.getToken({
+
+              vapidKey:
+                cfg.vapidKey,
+
+              serviceWorkerRegistration:
+                registration
+
+            });
+
+
+          console.log(
+            '[StudyPush] FCM token received:',
+            !!t
+          );
+
+
+          if(!t){
 
             throw new Error(
-              'Firebase Messaging is not initialized.'
+              'Firebase did not return an FCM token.'
             );
 
           }
 
 
-          const t =
-            await timeout(
+          /*
+          -----------------------------------------------
+           Save to Firestore
+          -----------------------------------------------
+          */
 
-              messaging.getToken({
-
-                vapidKey:
-                  cfg.vapidKey,
-
-                serviceWorkerRegistration:
-                  registration
-
-              }),
-
-              ENABLE_TIMEOUT,
-
-              'FCM getToken() timed out. The Firebase Messaging Service Worker may not be working correctly.'
-
-            );
-
-
-          log(
-            'STEP 5',
-            'FCM token received:',
+          await saveToken(
             t
           );
 
 
-          if (!t) {
+          /*
+          -----------------------------------------------
+           Sync progress
+          -----------------------------------------------
+          */
 
-            throw new Error(
-              'Firebase did not return a notification token.'
-            );
-
-          }
-
-
-          /* -----------------------------------------------
-             STEP 6 — Firestore
-             ----------------------------------------------- */
-
-          log(
-            'STEP 6',
-            'Saving device registration...'
-          );
-
-
-          await saveToken(t);
-
-
-          /* -----------------------------------------------
-             STEP 7 — Existing progress
-             ----------------------------------------------- */
-
-          log(
-            'STEP 7',
-            'Synchronizing existing progress...'
-          );
-
-
-          if (
+          if(
             window.upscGetStatusMap
-          ) {
+          ){
 
             await window.StudyPush
               .syncProgress(
@@ -883,83 +545,32 @@
           }
 
 
-          log(
-            'ENABLE',
-            '========================================'
-          );
-
-          log(
-            'ENABLE',
-            'NOTIFICATIONS ENABLED SUCCESSFULLY'
-          );
-
-          log(
-            'ENABLE',
-            '========================================'
+          console.log(
+            '[StudyPush] Notification setup complete.'
           );
 
 
           return true;
 
-        }
-        catch (e) {
-
-          /*
-            IMPORTANT:
-            Never leave the UI in "Enabling..." state.
-          */
-
-          localStorage.removeItem(
-            'upsc_push_enabled'
-          );
+        },
 
 
-          token = null;
+      /*
+      =======================================================
+       SYNC PROGRESS
+      =======================================================
+      */
+
+      syncProgress:
+        async statusMap => {
+
+          try{
+
+            const u =
+              await ensureUser();
 
 
-          setState('error');
-
-
-          console.error(
-            '[StudyPush] ========================================'
-          );
-
-          console.error(
-            '[StudyPush] NOTIFICATION SETUP FAILED'
-          );
-
-          console.error(
-            '[StudyPush] Error:',
-            e
-          );
-
-          console.error(
-            '[StudyPush] ========================================'
-          );
-
-
-          throw e;
-
-        }
-
-      },
-
-
-      /* =====================================================
-         SYNC PROGRESS
-         ===================================================== */
-
-      syncProgress: async statusMap => {
-
-        try {
-
-          const u =
-            await ensureUser();
-
-
-          await timeout(
-
-            db
+            await db
               .collection('users')
               .doc(u.uid)
               .set({
@@ -968,56 +579,46 @@
                   statusMap || {},
 
                 updatedAt:
-                  firebase.firestore.FieldValue
+                  firebase.firestore
+                    .FieldValue
                     .serverTimestamp()
 
               }, {
 
-                merge: true
+                merge:
+                  true
 
-              }),
+              });
 
-            ENABLE_TIMEOUT,
+          }
+          catch(e){
 
-            'Progress synchronization timed out.'
+            console.warn(
+              '[StudyPush] Progress sync failed:',
+              e
+            );
 
-          );
+          }
 
-
-          log(
-            'SYNC',
-            'Progress synchronized'
-          );
-
-        }
-        catch (e) {
-
-          warn(
-            'SYNC',
-            'Could not sync progress:',
-            e
-          );
-
-        }
-
-      },
+        },
 
 
-      /* =====================================================
-         ACKNOWLEDGE SESSION
-         ===================================================== */
+      /*
+      =======================================================
+       ACK SESSION
+      =======================================================
+      */
 
-      ackSession: async s => {
+      ackSession:
+        async s => {
 
-        try {
+          try{
 
-          const u =
-            await ensureUser();
+            const u =
+              await ensureUser();
 
 
-          await timeout(
-
-            db
+            await db
               .collection('users')
               .doc(u.uid)
               .collection('sessions')
@@ -1046,155 +647,147 @@
                   true,
 
                 acknowledgedAt:
-                  firebase.firestore.FieldValue
+                  firebase.firestore
+                    .FieldValue
                     .serverTimestamp()
 
               }, {
 
-                merge: true
+                merge:
+                  true
 
-              }),
+              });
 
-            ENABLE_TIMEOUT,
+          }
+          catch(e){
 
-            'Session acknowledgement timed out.'
+            console.warn(
+              '[StudyPush] Session sync failed:',
+              e
+            );
 
-          );
+          }
 
-
-          log(
-            'SESSION',
-            'Session acknowledgement synchronized'
-          );
-
-        }
-        catch (e) {
-
-          warn(
-            'SESSION',
-            'Could not sync session acknowledgement:',
-            e
-          );
-
-        }
-
-      },
+        },
 
 
-      /* =====================================================
-         DISABLE
-         ===================================================== */
+      /*
+      =======================================================
+       DISABLE
+      =======================================================
+      */
 
-      disable: async () => {
+      disable:
+        async () => {
 
-        try {
+          try{
 
-          const u =
-            await ensureUser();
+            const u =
+              await ensureUser();
 
 
-          await db
-            .collection('users')
-            .doc(u.uid)
-            .set({
+            await db
+              .collection('users')
+              .doc(u.uid)
+              .set({
 
-              enabled:
-                false,
+                enabled:
+                  false
 
-              updatedAt:
-                firebase.firestore.FieldValue
-                  .serverTimestamp()
+              }, {
 
-            }, {
+                merge:
+                  true
 
-              merge: true
+              });
 
-            });
+          }
+          finally{
 
-        }
-        finally {
+            localStorage.removeItem(
+              'upsc_push_enabled'
+            );
 
-          localStorage.removeItem(
-            'upsc_push_enabled'
-          );
 
-          token = null;
+            token =
+              null;
 
-          setState('disabled');
 
-          log(
-            'DISABLE',
-            'Study notifications disabled'
-          );
+            setState(
+              'disabled'
+            );
+
+          }
 
         }
-
-      }
 
     };
 
 
-    /* =======================================================
-       AUTH STATE
-       ======================================================= */
+    /*
+    =========================================================
+     AUTH STATE
+    =========================================================
+    */
 
     firebase.auth()
-      .onAuthStateChanged(u => {
+      .onAuthStateChanged(
+        u => {
 
-        if (u) {
+          if(u){
 
-          user = u;
+            user =
+              u;
 
-          log(
-            'AUTH',
-            'Firebase auth ready:',
-            u.uid
-          );
+
+            console.log(
+              '[StudyPush] Auth ready:',
+              u.uid
+            );
+
+          }
 
         }
-
-      });
-
-
-    /* =======================================================
-       FOREGROUND FCM MESSAGE
-       ======================================================= */
-
-    messaging.onMessage(payload => {
-
-      log(
-        'FCM',
-        'Foreground message received:',
-        payload
       );
 
 
-      const title =
-        payload.data?.title ||
-        payload.notification?.title ||
-        'UPSC Study Reminder';
+    /*
+    =========================================================
+     FOREGROUND MESSAGE
+    =========================================================
+    */
+
+    messaging.onMessage(
+      payload => {
+
+        console.log(
+          '[StudyPush] Foreground FCM:',
+          payload
+        );
 
 
-      const body =
-        payload.data?.body ||
-        payload.notification?.body ||
-        'Your study session needs attention.';
+        const title =
+          payload.data?.title ||
+          payload.notification?.title ||
+          'UPSC Study Reminder';
 
 
-      if (
-        Notification.permission ===
-        'granted'
-      ) {
+        const body =
+          payload.data?.body ||
+          payload.notification?.body ||
+          'Your study session needs attention.';
 
-        try {
+
+        if(
+          Notification.permission ===
+          'granted'
+        ){
 
           new Notification(
             title,
             {
 
-              body:
-
-                body,
+              body,
 
               icon:
                 './assets/icons/icon-192.png',
@@ -1207,96 +800,78 @@
                 'upsc-study',
 
               renotify:
-                true,
-
-              data: {
-
-                url:
-                  payload.data?.url ||
-                  './index.html'
-
-              }
+                true
 
             }
           );
 
         }
-        catch (e) {
-
-          warn(
-            'FCM',
-            'Could not display foreground notification:',
-            e
-          );
-
-        }
 
       }
+    );
 
-    });
 
+    /*
+    =========================================================
+     INITIAL STATE
+    =========================================================
+    */
 
-    /* =======================================================
-       INITIAL STATE
-       ======================================================= */
+    setState(
 
-    const storedEnabled =
+      Notification.permission ===
+        'granted' &&
+
       localStorage.getItem(
         'upsc_push_enabled'
-      ) === '1';
+      ) === '1'
 
+        ? 'enabled'
 
-    if (
-      Notification.permission === 'granted' &&
-      storedEnabled
-    ) {
+        : 'ready'
 
-      setState('enabled');
-
-    }
-    else {
-
-      setState('ready');
-
-    }
-
-
-    log(
-      'INIT',
-      'StudyPush ready'
     );
 
   }
-  catch (e) {
+
+  catch(e){
 
     console.error(
-      '[StudyPush] Firebase push initialization failed:',
+      '[StudyPush] Firebase initialization failed:',
       e
     );
 
 
     window.StudyPush = {
 
-      isEnabled: () => false,
+      isEnabled:
+        () => false,
 
-      isConfigured: () => true,
+      isConfigured:
+        () => true,
 
-      enable: async () => {
+      enable:
+        async () => {
 
-        throw e;
+          throw e;
 
-      },
+        },
 
-      syncProgress: async () => {},
+      syncProgress:
+        async () => {},
 
-      ackSession: async () => {},
+      ackSession:
+        async () => {},
 
-      disable: async () => {}
+      disable:
+        async () => {}
 
     };
 
 
-    setState('error');
+    setState(
+      'error'
+    );
 
   }
 
