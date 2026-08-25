@@ -50,3 +50,34 @@ The PWA now follows the same proven structure as the existing Excel Record Viewe
 - `assets/screenshots/mobile.png`
 
 The manifest uses absolute GitHub Pages HTTPS URLs for these assets.
+
+
+## V9 learning flow + sticky notes
+- Syllabus progression is now completion-based within each parallel study track; missed calendar days do not silently skip unfinished lessons.
+- The live 6:00/7:45/10:00 sessions select the first unfinished topic in their respective track.
+- Added a dedicated **My Sticky Notes** view.
+- Notes are stored per subject + topic in localStorage, timestamped, searchable by topic via the Open Topic action, and remain on the device until cleared/reset.
+
+
+## V10 status-button UX
+- The selected topic's current status button is visibly locked/disabled.
+- The other two status actions remain available.
+- Status buttons have hover, press, saving, and saved visual feedback.
+- The behavior is scoped to the currently selected topic only.
+
+
+## V11 session workflow
+- Removed permanent status buttons from the topic detail card.
+- At the end of a study session, a modal asks: **Completed / Partially Studied / Needs Revision**.
+- The choice is saved to the topic and the modal closes.
+- Partial and Revision are separate queues.
+- Added Firebase Cloud Messaging scaffolding for reminders when the PWA is closed.
+- The push backend is in `firebase/functions`; Firebase web config/VAPID values must be supplied before real push notifications can operate.
+
+
+### V11.1 correction
+Opening a session during its study period stops push reminders but does not mark the session result. At the scheduled end, the app still asks for Completed / Partial / Revision until a result is recorded. The Firebase function also sends a session-missed push at the end when the session remains unacknowledged.
+
+
+## V12 Firebase push
+Firebase push is wired for real FCM notifications. Complete `FIREBASE-SETUP.md`, configure `firebase-config.js` and `firebase-messaging-sw.js`, then deploy the included Cloud Function and Firestore rules.

@@ -2,11 +2,55 @@
 <header><div><div class="eyebrow">UPSC • ORA INTERVIEW</div><h1>Scientific Officer / Programmer</h1><p>UT Ladakh • Level 08 • Focused interview preparation</p></div><button id="installBtn" class="btn ghost hidden">Install App</button></header>
 <main>
 <section class="live card"><div class="liveLeft"><div id="dateLabel" class="eyebrow"></div><span id="statePill" class="pill">CHECKING SCHEDULE</span><h2 id="liveTitle">Loading…</h2><p id="liveMeta"></p><div id="liveTarget"></div></div><div class="count"><small id="countLabel">NEXT</small><strong id="countdown">--:--:--</strong><span id="countSub">checking device time</span></div></section>
-<nav><button class="active" data-view="today">Today</button><button data-view="schedule">Schedule</button><button data-view="syllabus">Syllabus</button><button data-view="progress">Progress</button><button data-view="interview">Interview</button></nav>
-<section id="today" class="view active"><div class="columns"><article class="card"><div class="head"><h3>Today's timetable</h3><span id="todayProgress"></span></div><div id="todayRows"></div></article><article class="card"><div class="head"><h3>Overall progress</h3><b id="overallPct">0%</b></div><div class="bar"><i id="overallBar"></i></div><div id="subjectBars"></div></article></div><article class="card"><div class="eyebrow">CURRENT / SELECTED TOPIC</div><h3 id="detailTitle">Select a topic</h3><span id="detailSubject" class="pill"></span><div id="detailContent"></div><div class="actions"><button id="complete" class="btn primary">Mark Complete</button><button id="revision" class="btn">Needs Revision</button><button id="partial" class="btn">Partially Studied</button></div><textarea id="notes" placeholder="Study notes / YouTube bookmark position…"></textarea><button id="saveNotes" class="btn ghost">Save Notes</button></article></section>
+<nav><button class="active" data-view="today">Today</button><button data-view="schedule">Schedule</button><button data-view="syllabus">Syllabus</button><button data-view="partialQueue">Partial</button><button data-view="revisionQueue">Revision</button><button data-view="progress">Progress</button><button data-view="notesView">Notes</button><button data-view="interview">Interview</button></nav>
+<section id="today" class="view active"><div class="columns"><article class="card"><div class="head"><h3>Today's timetable</h3><span id="todayProgress"></span></div><div id="todayRows"></div></article><article class="card"><div class="head"><h3>Overall progress</h3><b id="overallPct">0%</b></div><div class="bar"><i id="overallBar"></i></div><div id="subjectBars"></div></article></div><article class="card"><div class="eyebrow">CURRENT / SELECTED TOPIC</div><h3 id="detailTitle">Select a topic</h3><span id="detailSubject" class="pill"></span><div id="detailContent"></div><div id="topicStatusSummary" class="statusSummary"></div><textarea id="notes" placeholder="Sticky note for this topic — key facts, examples, doubts, panel questions…"></textarea><button id="saveNotes" class="btn ghost">Save Sticky Note</button></article></section>
 <section id="schedule" class="view"><article class="card"><div class="head"><h3>Master timetable</h3><span>19 Aug → 15 Sep 2026</span></div><div id="masterSchedule"></div></article></section>
 <section id="syllabus" class="view"><article class="card"><div class="head"><h3>Master syllabus</h3><input id="search" placeholder="Search topic or subject…"></div><div id="syllabusList"></div></article></section>
-<section id="progress" class="view"><div class="columns"><article class="card"><div class="head"><h3>Progress tracker</h3><span>Click status to change</span></div><div id="progressList"></div></article><article class="card"><h3>Study rules</h3><ol><li><b>Hard stop:</b> move on when the clock reaches the end of the period.</li><li><b>No perfection trap:</b> unfinished topics return through revision.</li><li><b>Notes:</b> definition, diagram, example, differences, pitfalls and panel follow-ups.</li><li><b>11:00–11:30:</b> recall aloud without notes.</li><li><b>Profile discipline:</b> anything you claim can become a panel follow-up.</li></ol><button id="reset" class="btn danger">Reset All Progress</button></article></div></section>
+
+<section id="partialQueue" class="view">
+ <article class="card">
+  <div class="head"><div><div class="eyebrow">UNFINISHED TOPICS</div><h3>Partial Queue</h3></div><span id="partialCount"></span></div>
+  <p class="queueIntro">Topics you started but have not finished. These stay here until you mark them Completed.</p>
+  <div id="partialList"></div>
+ </article>
+</section>
+<section id="revisionQueue" class="view">
+ <article class="card">
+  <div class="head"><div><div class="eyebrow">REVIEW QUEUE</div><h3>Revision Queue</h3></div><span id="revisionCount"></span></div>
+  <p class="queueIntro">Topics you studied but want to refresh before the interview.</p>
+  <div id="revisionList"></div>
+ </article>
+</section>
+<section id="progress" class="view"><div class="columns"><article class="card"><div class="head"><h3>Progress tracker</h3><span>Click status to change</span></div><div id="progressList"></div></article><article class="card"><h3>Study rules</h3>
+<div class="notificationCard">
+ <div class="head"><b>Study reminders</b><span id="pushState">Checking…</span></div>
+ <p>Get a reminder when a scheduled session starts and strict 30-minute follow-ups if you have not opened the app.</p>
+ <button id="enableNotifications" class="btn primary">Enable Study Notifications</button>
+ <div id="pushHelp" class="muted"></div>
+</div><ol><li><b>Hard stop:</b> move on when the clock reaches the end of the period.</li><li><b>No perfection trap:</b> unfinished topics return through revision.</li><li><b>Notes:</b> definition, diagram, example, differences, pitfalls and panel follow-ups.</li><li><b>11:00–11:30:</b> recall aloud without notes.</li><li><b>Profile discipline:</b> anything you claim can become a panel follow-up.</li></ol><button id="reset" class="btn danger">Reset All Progress</button></article></div></section>
+<section id="notesView" class="view"><article class="card"><div class="head"><h3>My Sticky Notes</h3><span>Saved on this device</span></div><div id="notesList"></div></article></section>
 <section id="interview" class="view"><article class="card"><div class="head"><h3>UPSC panel question bank</h3><span id="qCount"></span></div><div id="questions"></div></article></section>
-</main><footer>Local-first PWA • Progress and notes stay on this device</footer>
+</main>
+<div id="sessionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="sessionModalTitle">
+ <div class="modalBackdrop"></div>
+ <div class="modalCard">
+  <div class="eyebrow">SESSION TIME IS OVER</div>
+  <h2 id="sessionModalTitle">Study session finished</h2>
+  <p id="sessionModalTopic"></p>
+  <div class="modalTimer" id="sessionModalTime"></div>
+  <p class="modalPrompt">Select what you achieved in this session. Your choice will be saved and the tracker will move on.</p>
+  <div class="sessionChoices">
+   <button id="sessionDone" class="sessionChoice done"><b>✓ Completed</b><span>I can explain this without notes.</span></button>
+   <button id="sessionPartial" class="sessionChoice partial"><b>◐ Partially Studied</b><span>I need another session on this topic.</span></button>
+   <button id="sessionRevision" class="sessionChoice revision"><b>↻ Needs Revision</b><span>I studied it, but need to refresh it.</span></button>
+  </div>
+  <div id="sessionNext" class="sessionNext"></div>
+ </div>
+</div>
+<footer>Local-first PWA • Progress and notes stay on this device</footer>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
+<script src="firebase-config.js"></script><script src="firebase-client.js"></script>
 <script src="data.js"></script><script src="app.js"></script></body></html>

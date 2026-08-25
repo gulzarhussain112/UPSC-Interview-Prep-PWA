@@ -8,3 +8,64 @@
 .blockTitle{font-size:11px;letter-spacing:.12em;color:#61a8ff;font-weight:900;margin-bottom:7px}
 .liveTarget .target{max-width:900px}
 .targetTitle span{font-size:11px;color:#7ce0bd;border:1px solid #286b57;border-radius:999px;padding:4px 7px}
+
+.emptyNotes{padding:22px;color:#9fb3c8;border:1px dashed #29415d;border-radius:12px;text-align:center}
+.emptyNotes div{margin-top:7px;font-size:13px}
+.stickyNote{background:#102033;border:1px solid #2b4868;border-radius:14px;padding:15px;margin:12px 0;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+.stickyTop{display:flex;justify-content:space-between;align-items:flex-start;gap:15px}
+.stickyTop h4{margin:5px 0 0;color:#eef5ff;font-size:17px}
+.noteSubject{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#61a8ff;font-weight:900}
+.stickyBody{margin-top:12px;padding:12px;border-left:3px solid #7ce0bd;background:#0a1727;color:#c9d8e8;line-height:1.6;white-space:normal}
+.stickyTime{margin-top:9px;color:#71869d;font-size:11px}
+
+.actions .btn{
+ transition:transform .09s ease, background-color .16s ease, border-color .16s ease, box-shadow .16s ease, opacity .16s ease;
+ position:relative;
+ user-select:none;
+ -webkit-tap-highlight-color:transparent;
+}
+.actions .btn.status-action:hover{
+ background:#14283e;
+ border-color:#47709a;
+ box-shadow:0 3px 10px rgba(0,0,0,.18);
+ transform:translateY(-1px);
+}
+.actions .btn.status-action:active,
+.actions .btn.is-pressed{
+ transform:translateY(1px) scale(.97);
+ background:#315d87;
+ border-color:#6aaeff;
+ box-shadow:inset 0 2px 5px rgba(0,0,0,.22);
+}
+.actions .btn.current-status{
+ background:#142638;
+ border-color:#4b708f;
+ color:#8ea8bf;
+ opacity:.82;
+ cursor:not-allowed;
+ box-shadow:inset 0 1px 2px rgba(0,0,0,.22);
+}
+.actions .btn.current-status::after{
+ content:'LOCKED';
+ margin-left:7px;
+ font-size:9px;
+ letter-spacing:.08em;
+ opacity:.7;
+ vertical-align:1px;
+}
+.actions .btn.just-saved{
+ animation:statusSaved .55s ease;
+}
+@keyframes statusSaved{
+ 0%{transform:scale(1)}
+ 45%{transform:scale(1.035);box-shadow:0 0 0 4px rgba(124,224,189,.18)}
+ 100%{transform:scale(1)}
+}
+
+.statusSummary{margin:10px 0 0;padding:9px 12px;border:1px solid #29415d;border-radius:10px;background:#0a1726;color:#b8c9db}
+.statusSummaryLabel{font-size:12px;color:#7f95aa;margin-right:5px}
+.queueIntro{color:#91a7bd;margin-top:-4px}.queueItem{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:15px;border:1px solid var(--line);border-radius:13px;background:#0a1624;margin:10px 0}
+.queueMain{display:flex;gap:13px;align-items:flex-start}.queueNumber{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#142a40;color:#7ce0bd;font-weight:900}.queueItem h4{margin:3px 0 4px;font-size:17px}.queueItem p{margin:0;color:#8fa4b9;font-size:13px}.emptyQueue{padding:25px;text-align:center;border:1px dashed #29415d;border-radius:12px;color:#9eb2c7}
+.notificationCard{margin:14px 0;padding:13px;border:1px solid #29415d;border-radius:12px;background:#0a1726}.notificationCard p{color:#8fa4b9;font-size:13px;line-height:1.5}.notificationCard .head{margin-bottom:7px}
+.modal.hidden{display:none}.modal{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px}.modalBackdrop{position:absolute;inset:0;background:rgba(2,8,16,.78);backdrop-filter:blur(5px)}.modalCard{position:relative;width:min(620px,100%);max-height:90vh;overflow:auto;padding:25px;border:1px solid #345477;border-radius:18px;background:#0b1a2b;box-shadow:0 25px 70px rgba(0,0,0,.45)}.modalCard h2{margin:7px 0}.modalCard>p{color:#a6b9cd}.modalTimer{font-size:13px;color:#7ce0bd;margin:8px 0 16px}.modalPrompt{font-weight:700;color:#d6e2ef!important}.sessionChoices{display:grid;gap:10px}.sessionChoice{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:14px 15px;border:1px solid #294560;border-radius:12px;background:#0d1e31;color:#eef5ff;cursor:pointer;transition:transform .1s,background .15s,border-color .15s}.sessionChoice b{font-size:15px}.sessionChoice span{font-size:12px;color:#93a8bc;margin-top:4px}.sessionChoice:hover{transform:translateY(-1px);border-color:#5e8db8;background:#132b43}.sessionChoice:active{transform:scale(.985)}.sessionChoice.done{border-left:4px solid #7ce0bd}.sessionChoice.partial{border-left:4px solid #f0c674}.sessionChoice.revision{border-left:4px solid #7fb8ff}.sessionNext{margin-top:13px;color:#8ea5bb;font-size:13px}
+@media(max-width:700px){.queueItem{align-items:flex-start;flex-direction:column}.queueItem .btn{width:100%}.modalCard{padding:19px}}

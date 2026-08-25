@@ -1,9 +1,9 @@
-const CACHE='upsc-prep-v8';const ASSETS=[
+const CACHE='upsc-prep-v13.2.1';const ASSETS=[
  "./",
  "./index.html",
  "./style.css",
  "./data.js",
- "./app.js",
+ "./app.js","./firebase-config.js","./firebase-client.js","./firebase-messaging-sw.js",
  "./manifest.json",
  "./assets/icons/icon-192.png",
  "./assets/icons/icon-512.png",
