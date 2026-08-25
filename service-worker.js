@@ -1,4 +1,13 @@
-const CACHE = 'upsc-prep-v13.2.4';
+/*
+===========================================================
+ UPSC INTERVIEW PREP PWA
+ Single Service Worker
+ - PWA caching
+ - Firebase Cloud Messaging
+===========================================================
+*/
+
+const CACHE = 'upsc-prep-v14.0.0';
 
 const ASSETS = [
   './',
@@ -15,9 +24,12 @@ const ASSETS = [
   './assets/screenshots/mobile.png'
 ];
 
-/* =========================================================
-   FIREBASE CLOUD MESSAGING
-   ========================================================= */
+
+/*
+===========================================================
+ FIREBASE MESSAGING
+===========================================================
+*/
 
 importScripts(
   'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js'
@@ -26,6 +38,7 @@ importScripts(
 importScripts(
   'https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js'
 );
+
 
 firebase.initializeApp({
   apiKey: "AIzaSyAiyANqQh7Lqs80oOuavU93nvEY2diaGag",
@@ -36,144 +49,85 @@ firebase.initializeApp({
   appId: "1:632920971695:web:1d3c90a1484fbe1c95b75a"
 });
 
+
 const messaging = firebase.messaging();
 
+
 messaging.onBackgroundMessage(payload => {
+
+  console.log(
+    '[UPSC SW] Background FCM message:',
+    payload
+  );
+
 
   const title =
     payload.data?.title ||
     payload.notification?.title ||
     'UPSC Study Reminder';
 
+
   const body =
     payload.data?.body ||
     payload.notification?.body ||
     'Your scheduled study session needs attention.';
 
-  self.registration.showNotification(title, {
 
-    body,
+  const sessionId =
+    payload.data?.sessionId ||
+    'upsc-study';
 
-    icon: './assets/icons/icon-192.png',
 
-    badge: './assets/icons/icon-192.png',
+  const url =
+    payload.data?.url ||
+    './index.html';
 
-    tag:
-      payload.data?.sessionId ||
-      'upsc-study',
 
-    renotify: true,
+  self.registration.showNotification(
+    title,
+    {
+      body,
 
-    data: {
-      url:
-        payload.data?.url ||
-        './index.html'
+      icon:
+        './assets/icons/icon-192.png',
+
+      badge:
+        './assets/icons/icon-192.png',
+
+      tag:
+        sessionId,
+
+      renotify:
+        true,
+
+      data: {
+        url
+      }
     }
-
-  });
-
-});
-
-
-/* =========================================================
-   PWA CACHE
-   ========================================================= */
-
-self.addEventListener('install', event => {
-
-  event.waitUntil(
-
-    caches.open(CACHE)
-
-      .then(cache => cache.addAll(ASSETS))
-
-      .then(() => self.skipWaiting())
-
   );
 
 });
 
 
-/* =========================================================
-   ACTIVATE
-   ========================================================= */
+/*
+===========================================================
+ NOTIFICATION CLICK
+===========================================================
+*/
 
-self.addEventListener('activate', event => {
+self.addEventListener(
+  'notificationclick',
+  event => {
 
-  event.waitUntil(
-
-    caches.keys()
-
-      .then(keys =>
-
-        Promise.all(
-
-          keys
-
-            .filter(key => key !== CACHE)
-
-            .map(key => caches.delete(key))
-
-        )
-
-      )
-
-      .then(() => self.clients.claim())
-
-  );
-
-});
+    event.notification.close();
 
 
-/* =========================================================
-   FETCH
-   ========================================================= */
+    event.waitUntil(
 
-self.addEventListener('fetch', event => {
-
-  /*
-   * Only handle GET requests.
-   * This prevents the cache handler from interfering
-   * with POST/other Firebase/network requests.
-   */
-
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  event.respondWith(
-
-    caches.match(event.request)
-
-      .then(cached => {
-
-        if (cached) {
-          return cached;
-        }
-
-        return fetch(event.request);
-
+      clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
       })
-
-  );
-
-});
-
-
-/* =========================================================
-   NOTIFICATION CLICK
-   ========================================================= */
-
-self.addEventListener('notificationclick', event => {
-
-  event.notification.close();
-
-  event.waitUntil(
-
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    })
 
       .then(list => {
 
@@ -185,14 +139,18 @@ self.addEventListener('notificationclick', event => {
           ).href;
 
 
-        /* Try to focus the exact app window */
+        /*
+        -----------------------------------------------
+        Existing UPSC tab/app
+        -----------------------------------------------
+        */
 
-        for (const client of list) {
+        for(const client of list){
 
-          if (
+          if(
             client.url === target &&
             'focus' in client
-          ) {
+          ){
 
             return client.focus();
 
@@ -201,23 +159,173 @@ self.addEventListener('notificationclick', event => {
         }
 
 
-        /* Otherwise focus any existing app window */
+        /*
+        -----------------------------------------------
+        Any existing UPSC window
+        -----------------------------------------------
+        */
 
-        for (const client of list) {
+        for(const client of list){
 
-          if ('focus' in client) {
+          if(
+            'focus' in client
+          ){
+
             return client.focus();
+
           }
 
         }
 
 
-        /* Otherwise open the app */
+        /*
+        -----------------------------------------------
+        Open new window
+        -----------------------------------------------
+        */
 
         return clients.openWindow(target);
 
       })
 
-  );
+    );
 
-});
+  }
+);
+
+
+/*
+===========================================================
+ INSTALL
+===========================================================
+*/
+
+self.addEventListener(
+  'install',
+  event => {
+
+    console.log(
+      '[UPSC SW] Installing',
+      CACHE
+    );
+
+
+    event.waitUntil(
+
+      caches
+        .open(CACHE)
+
+        .then(cache => {
+
+          return cache.addAll(ASSETS);
+
+        })
+
+        .then(() => {
+
+          return self.skipWaiting();
+
+        })
+
+    );
+
+  }
+);
+
+
+/*
+===========================================================
+ ACTIVATE
+===========================================================
+*/
+
+self.addEventListener(
+  'activate',
+  event => {
+
+    console.log(
+      '[UPSC SW] Activating',
+      CACHE
+    );
+
+
+    event.waitUntil(
+
+      caches
+        .keys()
+
+        .then(keys => {
+
+          return Promise.all(
+
+            keys
+
+              .filter(
+                key => key !== CACHE
+              )
+
+              .map(
+                key => caches.delete(key)
+              )
+
+          );
+
+        })
+
+        .then(() => {
+
+          return self.clients.claim();
+
+        })
+
+    );
+
+  }
+);
+
+
+/*
+===========================================================
+ FETCH
+===========================================================
+*/
+
+self.addEventListener(
+  'fetch',
+  event => {
+
+    /*
+    Do not interfere with non-GET requests.
+    */
+
+    if(
+      event.request.method !== 'GET'
+    ){
+
+      return;
+
+    }
+
+
+    event.respondWith(
+
+      caches
+        .match(event.request)
+
+        .then(cached => {
+
+          if(cached){
+
+            return cached;
+
+          }
+
+
+          return fetch(event.request);
+
+        })
+
+    );
+
+  }
+);
