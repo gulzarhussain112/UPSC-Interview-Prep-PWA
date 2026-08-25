@@ -5,6 +5,10 @@ on:
     - cron: "*/30 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   send-reminders:
     runs-on: ubuntu-latest
@@ -24,8 +28,12 @@ jobs:
         working-directory: github-scheduler
         run: npm install
 
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/632920971695/locations/global/workloadIdentityPools/github-actions/providers/github-actions"
+          service_account: "firebase-adminsdk-fbsvc@interview-prep-upsc.iam.gserviceaccount.com"
+
       - name: Run reminder scheduler
         working-directory: github-scheduler
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node scheduler.js
