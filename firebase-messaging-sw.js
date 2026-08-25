@@ -1,9 +1,10 @@
-/* Firebase Cloud Messaging service worker.
- * IMPORTANT: replace the placeholder values below with the SAME Firebase Web App config
- * used in firebase-config.js before deploying.
- */
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
+importScripts(
+  'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js'
+);
+
+importScripts(
+  'https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js'
+);
 
 firebase.initializeApp({
   apiKey: "AIzaSyAiyANqQh7Lqs80oOuavU93nvEY2diaGag",
@@ -14,32 +15,57 @@ firebase.initializeApp({
   appId: "1:632920971695:web:1d3c90a1484fbe1c95b75a"
 });
 
-const messaging=firebase.messaging();
+const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(payload=>{
-  const title=payload.data?.title || payload.notification?.title || 'UPSC Study Reminder';
-  const body=payload.data?.body || payload.notification?.body || 'Your scheduled study session needs attention.';
-  self.registration.showNotification(title,{
+messaging.onBackgroundMessage(payload => {
+  const title =
+    payload.data?.title ||
+    payload.notification?.title ||
+    'UPSC Study Reminder';
+
+  const body =
+    payload.data?.body ||
+    payload.notification?.body ||
+    'Your scheduled study session needs attention.';
+
+  self.registration.showNotification(title, {
     body,
-    icon:'./assets/icons/icon-192.png',
-    badge:'./assets/icons/icon-192.png',
-    tag:payload.data?.sessionId || 'upsc-study',
-    renotify:true,
-    data:{url:payload.data?.url || './index.html'}
+    icon: './assets/icons/icon-192.png',
+    badge: './assets/icons/icon-192.png',
+    tag: payload.data?.sessionId || 'upsc-study',
+    renotify: true,
+    data: {
+      url: payload.data?.url || './index.html'
+    }
   });
 });
 
-self.addEventListener('notificationclick',event=>{
+self.addEventListener('notificationclick', event => {
   event.notification.close();
+
   event.waitUntil(
-    clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
-      const target=new URL(event.notification.data?.url || './index.html',self.location.origin).href;
-      for(const c of list){
-        if(c.url===target && 'focus' in c)return c.focus();
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(list => {
+
+      const target = new URL(
+        event.notification.data?.url || './index.html',
+        self.location.origin
+      ).href;
+
+      for (const client of list) {
+        if (client.url === target && 'focus' in client) {
+          return client.focus();
+        }
       }
-      for(const c of list){
-        if('focus' in c)return c.focus();
+
+      for (const client of list) {
+        if ('focus' in client) {
+          return client.focus();
+        }
       }
+
       return clients.openWindow(target);
     })
   );
