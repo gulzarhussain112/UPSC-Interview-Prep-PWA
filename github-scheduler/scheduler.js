@@ -4,15 +4,11 @@ const admin = require('firebase-admin');
 
 /*
 ===========================================================
-TEMPORARY TEST SWITCH
+TEST SWITCH
 ===========================================================
 
-Set this to TRUE only when you want to test notifications.
-
-TRUE  = send a test notification immediately to every
-        enabled user having an FCM token.
-
-FALSE = use the normal study timetable scheduler.
+true  = send immediate test notification
+false = normal timetable scheduler
 */
 const TEST_NOTIFICATION = false;
 
@@ -24,7 +20,7 @@ const messaging = admin.messaging();
 
 
 /* =========================================================
-   LOAD SCHEDULE
+   LOAD DATA.JS
    ========================================================= */
 
 const data = fs.readFileSync('../data.js', 'utf8');
@@ -42,30 +38,30 @@ const SCHEDULE = ctx.SCHEDULE;
 
 
 /* =========================================================
-   STUDY SLOTS
+   DAILY STUDY SLOTS
    ========================================================= */
 
 const SLOTS = [
   {
     slot: 0,
-    start: 1080,
-    end: 1170
+    start: 1080, // 6:00 PM
+    end: 1170   // 7:30 PM
   },
   {
     slot: 1,
-    start: 1185,
-    end: 1275
+    start: 1185, // 7:45 PM
+    end: 1275   // 9:15 PM
   },
   {
     slot: 2,
-    start: 1320,
-    end: 1380
+    start: 1320, // 10:00 PM
+    end: 1380   // 11:00 PM
   }
 ];
 
 
 /* =========================================================
-   TIMEZONE
+   LOCAL DATE / TIME FOR USER
    ========================================================= */
 
 function localNow(timeZone) {
@@ -82,8 +78,8 @@ function localNow(timeZone) {
     }).formatToParts(new Date());
 
 
-  const get = n =>
-    parts.find(x => x.type === n)?.value;
+  const get = type =>
+    parts.find(x => x.type === type)?.value;
 
 
   return {
@@ -101,34 +97,6 @@ function localNow(timeZone) {
 
 
 /* =========================================================
-   FIND NEXT TRACK TOPIC
-   ========================================================= */
-
-function trackEntry(statusMap, slot) {
-
-  for (const d of Object.keys(SCHEDULE).sort()) {
-
-    const e =
-      (SCHEDULE[d] || [])[slot];
-
-
-    if (
-      e &&
-      statusMap[`${e[1]}||${e[2]}`] !== 'done'
-    ) {
-
-      return e;
-
-    }
-
-  }
-
-  return null;
-
-}
-
-
-/* =========================================================
    SESSION ID
    ========================================================= */
 
@@ -140,10 +108,33 @@ function sessionId(date, slot) {
 
 
 /* =========================================================
-   NORMAL MESSAGE
+   NORMAL REMINDER MESSAGES
    ========================================================= */
 
 function messageFor(stage, subject, topic) {
+
+  /* -------------------------------------------------------
+     15 MINUTES BEFORE
+     ------------------------------------------------------- */
+
+  if (stage === -15) {
+
+    return {
+
+      title: '🔔 STUDY SESSION IN 15 MINUTES',
+
+      body:
+        `${subject} — ${topic}\n` +
+        `Get ready. Your study session starts in 15 minutes.`
+
+    };
+
+  }
+
+
+  /* -------------------------------------------------------
+     SESSION START
+     ------------------------------------------------------- */
 
   if (stage === 0) {
 
@@ -161,6 +152,10 @@ function messageFor(stage, subject, topic) {
   }
 
 
+  /* -------------------------------------------------------
+     30 MINUTES
+     ------------------------------------------------------- */
+
   if (stage === 30) {
 
     return {
@@ -176,6 +171,10 @@ function messageFor(stage, subject, topic) {
 
   }
 
+
+  /* -------------------------------------------------------
+     60 MINUTES
+     ------------------------------------------------------- */
 
   if (stage === 60) {
 
@@ -194,6 +193,10 @@ function messageFor(stage, subject, topic) {
   }
 
 
+  /* -------------------------------------------------------
+     SESSION END
+     ------------------------------------------------------- */
+
   return {
 
     title: '🚨 STUDY SESSION MISSED',
@@ -209,17 +212,13 @@ function messageFor(stage, subject, topic) {
 
 
 /* =========================================================
-   TEMPORARY TEST NOTIFICATION
+   SEND TEST NOTIFICATION
    ========================================================= */
 
 async function sendTestNotification(userDoc) {
 
   const u = userDoc.data();
 
-
-  /*
-  Ignore devices that have no usable registration token.
-  */
 
   if (
     !u.enabled ||
@@ -236,39 +235,37 @@ async function sendTestNotification(userDoc) {
   }
 
 
-  const message = {
-
-    token: u.fcmToken,
-
-    data: {
-
-      title: '🔔 UPSC TEST NOTIFICATION',
-
-      body:
-        'FCM is working correctly. ' +
-        'Your UPSC study reminders are connected.',
-
-      sessionId:
-        `TEST-${Date.now()}`,
-
-      url:
-        './index.html',
-
-      event:
-        'test',
-
-      stage:
-        'test'
-
-    }
-
-  };
-
-
   try {
 
     const response =
-      await messaging.send(message);
+      await messaging.send({
+
+        token: u.fcmToken,
+
+        data: {
+
+          title:
+            '🔔 UPSC TEST NOTIFICATION',
+
+          body:
+            'FCM is working correctly. ' +
+            'Your UPSC study reminders are connected.',
+
+          sessionId:
+            `TEST-${Date.now()}`,
+
+          url:
+            './index.html',
+
+          event:
+            'test',
+
+          stage:
+            'test'
+
+        }
+
+      });
 
 
     console.log(
@@ -290,37 +287,10 @@ async function sendTestNotification(userDoc) {
     );
 
 
-    /*
-    Automatically disable stale/invalid tokens.
-    */
-
-    if (
-      [
-        'messaging/registration-token-not-registered',
-        'messaging/invalid-registration-token'
-      ].includes(err.code)
-    ) {
-
-      console.log(
-        '🧹 Removing stale notification device:',
-        userDoc.id
-      );
-
-
-      await userDoc.ref.set({
-
-        enabled: false,
-
-        fcmToken: admin.firestore.FieldValue.delete(),
-
-        updatedAt:
-          admin.firestore.FieldValue.serverTimestamp()
-
-      }, {
-        merge: true
-      });
-
-    }
+    await handleTokenError(
+      userDoc,
+      err
+    );
 
   }
 
@@ -328,13 +298,200 @@ async function sendTestNotification(userDoc) {
 
 
 /* =========================================================
-   NORMAL SCHEDULER
+   HANDLE INVALID FCM TOKEN
+   ========================================================= */
+
+async function handleTokenError(userDoc, err) {
+
+  if (
+    [
+      'messaging/registration-token-not-registered',
+      'messaging/invalid-registration-token'
+    ].includes(err.code)
+  ) {
+
+    console.log(
+      '🧹 Removing stale notification device:',
+      userDoc.id
+    );
+
+
+    await userDoc.ref.set({
+
+      enabled:
+        false,
+
+      fcmToken:
+        admin.firestore.FieldValue.delete(),
+
+      updatedAt:
+        admin.firestore.FieldValue.serverTimestamp()
+
+    }, {
+      merge: true
+    });
+
+  }
+
+}
+
+
+/* =========================================================
+   SEND NORMAL REMINDER
+   ========================================================= */
+
+async function sendReminder(
+  userDoc,
+  sessionRef,
+  sessionIdValue,
+  date,
+  slotInfo,
+  entry,
+  stage
+) {
+
+  const subject =
+    entry[1];
+
+  const topic =
+    entry[2];
+
+
+  const msg =
+    messageFor(
+      stage,
+      subject,
+      topic
+    );
+
+
+  try {
+
+    await messaging.send({
+
+      token:
+        userDoc.data().fcmToken,
+
+      data: {
+
+        title:
+          msg.title,
+
+        body:
+          msg.body,
+
+        sessionId:
+          sessionIdValue,
+
+        date:
+          date,
+
+        slot:
+          String(slotInfo.slot),
+
+        url:
+          './index.html',
+
+        event:
+          stage === 90
+            ? 'session_end'
+            : stage === -15
+              ? 'prepare'
+              : 'reminder',
+
+        stage:
+          String(stage)
+
+      }
+
+    });
+
+
+    /*
+    Store the exact reminder stage.
+
+    -15 = preparation
+     0  = session start
+    30  = 30-minute reminder
+    60  = 60-minute reminder
+    90  = session finished
+    */
+
+    await sessionRef.set({
+
+      date:
+        date,
+
+      slot:
+        slotInfo.slot,
+
+      start:
+        slotInfo.start,
+
+      end:
+        slotInfo.end,
+
+      subject:
+        subject,
+
+      topic:
+        topic,
+
+      lastReminderStage:
+        stage,
+
+      lastReminderAt:
+        admin.firestore.FieldValue
+          .serverTimestamp()
+
+    }, {
+      merge: true
+    });
+
+
+    console.log(
+      '✅ Sent',
+      msg.title,
+      'to',
+      userDoc.id,
+      sessionIdValue
+    );
+
+  }
+  catch (err) {
+
+    console.error(
+      '❌ FCM error for',
+      userDoc.id,
+      err.code || err.message
+    );
+
+
+    await handleTokenError(
+      userDoc,
+      err
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   NORMAL USER SCHEDULER
    ========================================================= */
 
 async function sendForUser(userDoc) {
 
-  const u = userDoc.data();
+  const u =
+    userDoc.data();
 
+
+  /*
+  ---------------------------------------------------------
+  User must have an enabled FCM registration.
+  ---------------------------------------------------------
+  */
 
   if (
     !u.enabled ||
@@ -348,35 +505,103 @@ async function sendForUser(userDoc) {
 
 
   const now =
-    localNow(u.timezone);
+    localNow(
+      u.timezone
+    );
 
 
-  const day =
+  console.log(
+    `User ${userDoc.id}: ${now.date} ${now.minutes} minutes`
+  );
+
+
+  /*
+  ---------------------------------------------------------
+  IMPORTANT:
+  Use ONLY today's schedule.
+  ---------------------------------------------------------
+  */
+
+  const todaySchedule =
     SCHEDULE[now.date];
 
 
-  if (!day) {
+  if (!todaySchedule) {
+
+    console.log(
+      'No schedule for',
+      now.date,
+      'for user',
+      userDoc.id
+    );
 
     return;
 
   }
 
 
+  /*
+  ---------------------------------------------------------
+  Check all three slots.
+  ---------------------------------------------------------
+  */
+
   for (const slotInfo of SLOTS) {
 
-    const e =
-      trackEntry(
-        u.status || {},
-        slotInfo.slot
-      );
+    /*
+    Today's exact scheduled entry for this slot.
+    */
+
+    const entry =
+      todaySchedule[slotInfo.slot];
 
 
-    if (!e) {
+    if (!entry) {
 
       continue;
 
     }
 
+
+    const subject =
+      entry[1];
+
+    const topic =
+      entry[2];
+
+
+    /*
+    -------------------------------------------------------
+    Check whether THIS TODAY'S topic is already completed.
+    -------------------------------------------------------
+    */
+
+    const statusKey =
+      `${subject}||${topic}`;
+
+
+    const status =
+      (u.status || {})[statusKey];
+
+
+    if (status === 'done') {
+
+      console.log(
+        'Skipping completed topic:',
+        subject,
+        topic
+      );
+
+      continue;
+
+    }
+
+
+    /*
+    -------------------------------------------------------
+    Session Firestore document.
+    -------------------------------------------------------
+    */
 
     const id =
       sessionId(
@@ -402,8 +627,10 @@ async function sendForUser(userDoc) {
 
 
     /*
-    Opening the PWA during the session marks it
-    acknowledged and stops further reminders.
+    -------------------------------------------------------
+    If user has already opened/acknowledged the session,
+    no more notifications are necessary.
+    -------------------------------------------------------
     */
 
     if (session.acknowledged) {
@@ -413,48 +640,122 @@ async function sendForUser(userDoc) {
     }
 
 
+    /*
+    -------------------------------------------------------
+    Calculate time relative to session start.
+    -------------------------------------------------------
+    */
+
     const elapsed =
       now.minutes -
       slotInfo.start;
 
 
-    let stage = null;
+    let stage =
+      null;
 
+
+    /*
+    -------------------------------------------------------
+    15-MINUTE PREPARATION WINDOW
+
+    Example:
+    6:00 PM start
+
+    5:45 PM → -15
+    5:50 PM → -10
+    5:55 PM → -5
+
+    Because GitHub runs every 5 minutes, the first run
+    at/after 5:45 will send the preparation notification.
+    -------------------------------------------------------
+    */
 
     if (
+      elapsed >= -15 &&
+      elapsed < 0
+    ) {
+
+      stage =
+        -15;
+
+    }
+
+
+    /*
+    -------------------------------------------------------
+    SESSION START → 30 MINUTES
+    -------------------------------------------------------
+    */
+
+    else if (
       elapsed >= 0 &&
+      elapsed < 30
+    ) {
+
+      stage =
+        0;
+
+    }
+
+
+    /*
+    -------------------------------------------------------
+    30 → 60 MINUTES
+    -------------------------------------------------------
+    */
+
+    else if (
+      elapsed >= 30 &&
+      elapsed < 60
+    ) {
+
+      stage =
+        30;
+
+    }
+
+
+    /*
+    -------------------------------------------------------
+    60 MINUTES → SESSION END
+    -------------------------------------------------------
+    */
+
+    else if (
+      elapsed >= 60 &&
       elapsed <
         slotInfo.end -
         slotInfo.start
     ) {
 
-      if (elapsed < 30) {
-
-        stage = 0;
-
-      }
-      else if (elapsed < 60) {
-
-        stage = 30;
-
-      }
-      else {
-
-        stage = 60;
-
-      }
+      stage =
+        60;
 
     }
+
+
+    /*
+    -------------------------------------------------------
+    SESSION FINISHED
+    -------------------------------------------------------
+    */
+
     else if (
       elapsed >=
-      slotInfo.end -
-      slotInfo.start
+        slotInfo.end -
+        slotInfo.start
     ) {
 
-      stage = 90;
+      stage =
+        90;
 
     }
 
+
+    /*
+    Nothing to send right now.
+    */
 
     if (stage === null) {
 
@@ -464,7 +765,15 @@ async function sendForUser(userDoc) {
 
 
     /*
-    Do not send the same reminder stage twice.
+    -------------------------------------------------------
+    PREVENT DUPLICATES
+    -------------------------------------------------------
+
+    Since GitHub runs every 5 minutes, the same stage can
+    be detected multiple times.
+
+    Firestore remembers the last stage we sent.
+    -------------------------------------------------------
     */
 
     if (
@@ -476,134 +785,29 @@ async function sendForUser(userDoc) {
     }
 
 
-    const msg =
-      messageFor(
-        stage,
-        e[1],
-        e[2]
-      );
+    /*
+    -------------------------------------------------------
+    SEND
+    -------------------------------------------------------
+    */
 
+    await sendReminder(
 
-    try {
+      userDoc,
 
-      await messaging.send({
+      ref,
 
-        token: u.fcmToken,
+      id,
 
-        data: {
+      now.date,
 
-          title: msg.title,
+      slotInfo,
 
-          body: msg.body,
+      entry,
 
-          sessionId: id,
+      stage
 
-          date: now.date,
-
-          slot:
-            String(slotInfo.slot),
-
-          url:
-            './index.html',
-
-          event:
-            stage === 90
-              ? 'session_end'
-              : 'reminder',
-
-          stage:
-            String(stage)
-
-        }
-
-      });
-
-
-      await ref.set({
-
-        date:
-          now.date,
-
-        slot:
-          slotInfo.slot,
-
-        start:
-          slotInfo.start,
-
-        end:
-          slotInfo.end,
-
-        subject:
-          e[1],
-
-        topic:
-          e[2],
-
-        lastReminderStage:
-          stage,
-
-        lastReminderAt:
-          admin.firestore.FieldValue
-            .serverTimestamp()
-
-      }, {
-        merge: true
-      });
-
-
-      console.log(
-        '✅ Sent',
-        msg.title,
-        'to',
-        userDoc.id,
-        id
-      );
-
-    }
-    catch (err) {
-
-      console.error(
-        '❌ FCM error for',
-        userDoc.id,
-        err.code || err.message
-      );
-
-
-      /*
-      Automatically clean stale tokens.
-      */
-
-      if (
-        [
-          'messaging/registration-token-not-registered',
-          'messaging/invalid-registration-token'
-        ].includes(err.code)
-      ) {
-
-        console.log(
-          '🧹 Disabling stale device:',
-          userDoc.id
-        );
-
-
-        await userDoc.ref.set({
-
-          enabled: false,
-
-          fcmToken:
-            admin.firestore.FieldValue.delete(),
-
-          updatedAt:
-            admin.firestore.FieldValue
-              .serverTimestamp()
-
-        }, {
-          merge: true
-        });
-
-      }
-
-    }
+    );
 
   }
 
@@ -616,71 +820,77 @@ async function sendForUser(userDoc) {
 
 (async () => {
 
-  const users =
-    await db
-      .collection('users')
-      .get();
+  try {
 
+    const users =
+      await db
+        .collection('users')
+        .get();
 
-  console.log(
-    `Found ${users.size} user/device records`
-  );
-
-
-  /*
-  =========================================================
-  TEST MODE
-  =========================================================
-  */
-
-  if (TEST_NOTIFICATION) {
 
     console.log(
-      '🧪 TEST MODE ENABLED'
+      `Found ${users.size} user/device records`
     );
 
+
+    /* =====================================================
+       TEST MODE
+       ===================================================== */
+
+    if (TEST_NOTIFICATION) {
+
+      console.log(
+        '🧪 TEST MODE ENABLED'
+      );
+
+
+      for (const doc of users.docs) {
+
+        await sendTestNotification(doc);
+
+      }
+
+
+      console.log(
+        '🧪 TEST MODE FINISHED'
+      );
+
+
+      return;
+
+    }
+
+
+    /* =====================================================
+       NORMAL MODE
+       ===================================================== */
+
     console.log(
-      'Sending test notification to enabled devices...'
+      `Checking users at ${new Date().toISOString()}`
     );
 
 
     for (const doc of users.docs) {
 
-      await sendTestNotification(doc);
+      await sendForUser(doc);
 
     }
 
 
     console.log(
-      '🧪 TEST MODE FINISHED'
+      '✅ Normal scheduler finished'
     );
 
+  }
+  catch (err) {
 
-    return;
+    console.error(
+      '❌ Scheduler failed:',
+      err
+    );
+
+    process.exitCode = 1;
 
   }
-
-
-  /*
-  =========================================================
-  NORMAL MODE
-  =========================================================
-  */
-
-  console.log(
-    `Checking users at ${new Date().toISOString()}`
-  );
-
-
-  for (const doc of users.docs) {
-
-    await sendForUser(doc);
-
-  }
-
-
-  console.log(
-    '✅ Normal scheduler finished'
-  );
 
 })();
