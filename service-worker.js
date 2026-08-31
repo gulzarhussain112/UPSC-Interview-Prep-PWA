@@ -3,17 +3,13 @@
    PWA CACHE + FIREBASE CLOUD MESSAGING
    ========================================================= */
 
-importScripts(
-  'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js'
-);
-
-importScripts(
-  'https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js'
-);
+/* Firebase libraries hosted locally */
+importScripts('./firebase-app-compat.js');
+importScripts('./firebase-messaging-compat.js');
 
 
 /* =========================================================
-   FIREBASE
+   FIREBASE INITIALIZATION
    ========================================================= */
 
 firebase.initializeApp({
@@ -29,10 +25,10 @@ const messaging = firebase.messaging();
 
 
 /* =========================================================
-   CACHE
+   PWA CACHE
    ========================================================= */
 
-const CACHE = 'upsc-prep-v13.2.5';
+const CACHE = 'upsc-prep-v13.2.6';
 
 const ASSETS = [
   './',
@@ -42,6 +38,8 @@ const ASSETS = [
   './app.js',
   './firebase-config.js',
   './firebase-client.js',
+  './firebase-app-compat.js',
+  './firebase-messaging-compat.js',
   './manifest.json',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
@@ -56,13 +54,13 @@ const ASSETS = [
 
 self.addEventListener('install', event => {
 
+  console.log('[SW] Installing:', CACHE);
+
   event.waitUntil(
 
     caches.open(CACHE)
 
       .then(cache => {
-
-        console.log('[SW] Caching application assets');
 
         return cache.addAll(ASSETS);
 
@@ -70,7 +68,7 @@ self.addEventListener('install', event => {
 
       .then(() => {
 
-        console.log('[SW] Install complete');
+        console.log('[SW] All assets cached');
 
         return self.skipWaiting();
 
@@ -87,6 +85,8 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
 
+  console.log('[SW] Activating:', CACHE);
+
   event.waitUntil(
 
     caches.keys()
@@ -96,9 +96,7 @@ self.addEventListener('activate', event => {
         return Promise.all(
 
           keys
-
             .filter(key => key !== CACHE)
-
             .map(key => caches.delete(key))
 
         );
@@ -107,7 +105,7 @@ self.addEventListener('activate', event => {
 
       .then(() => {
 
-        console.log('[SW] Activated');
+        console.log('[SW] Old caches removed');
 
         return self.clients.claim();
 
@@ -153,10 +151,7 @@ self.addEventListener('fetch', event => {
 
 messaging.onBackgroundMessage(payload => {
 
-  console.log(
-    '[SW] Background FCM message:',
-    payload
-  );
+  console.log('[SW] Background FCM message:', payload);
 
 
   const title =
@@ -186,22 +181,18 @@ messaging.onBackgroundMessage(payload => {
     title,
 
     {
-      body,
+      body: body,
 
-      icon:
-        './assets/icons/icon-192.png',
+      icon: './assets/icons/icon-192.png',
 
-      badge:
-        './assets/icons/icon-192.png',
+      badge: './assets/icons/icon-192.png',
 
-      tag:
-        sessionId,
+      tag: sessionId,
 
-      renotify:
-        true,
+      renotify: true,
 
       data: {
-        url
+        url: url
       }
 
     }
@@ -215,83 +206,71 @@ messaging.onBackgroundMessage(payload => {
    NOTIFICATION CLICK
    ========================================================= */
 
-self.addEventListener(
-  'notificationclick',
-  event => {
+self.addEventListener('notificationclick', event => {
 
-    event.notification.close();
+  event.notification.close();
 
 
-    event.waitUntil(
+  event.waitUntil(
 
-      clients.matchAll({
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    })
 
-        type: 'window',
+    .then(list => {
 
-        includeUncontrolled: true
-
-      })
-
-      .then(list => {
-
-        const target =
-          new URL(
-
-            event.notification.data?.url ||
-            './index.html',
-
-            self.location.origin
-
-          ).href;
+      const target = new URL(
+        event.notification.data?.url || './index.html',
+        self.location.origin
+      ).href;
 
 
-        /* -----------------------------------------------
-           Existing app window
-           ----------------------------------------------- */
+      /* -----------------------------------------------
+         Focus exact existing page
+         ----------------------------------------------- */
 
-        for (const client of list) {
+      for (const client of list) {
 
-          if (
-            client.url === target &&
-            'focus' in client
-          ) {
+        if (
+          client.url === target &&
+          'focus' in client
+        ) {
 
-            return client.focus();
-
-          }
+          return client.focus();
 
         }
 
-
-        /* -----------------------------------------------
-           Any existing app window
-           ----------------------------------------------- */
-
-        for (const client of list) {
-
-          if ('focus' in client) {
-
-            return client.focus();
-
-          }
-
-        }
+      }
 
 
-        /* -----------------------------------------------
-           Open new window
-           ----------------------------------------------- */
+      /* -----------------------------------------------
+         Otherwise focus any existing app window
+         ----------------------------------------------- */
 
-        if (clients.openWindow) {
+      for (const client of list) {
 
-          return clients.openWindow(target);
+        if ('focus' in client) {
+
+          return client.focus();
 
         }
 
-      })
+      }
 
-    );
 
-  }
+      /* -----------------------------------------------
+         Open the app
+         ----------------------------------------------- */
 
-);
+      if (clients.openWindow) {
+
+        return clients.openWindow(target);
+
+      }
+
+    })
+
+  );
+
+});
