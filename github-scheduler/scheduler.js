@@ -14,7 +14,7 @@ TRUE  = send a test notification immediately to every
 
 FALSE = use the normal study timetable scheduler.
 */
-const TEST_NOTIFICATION = true;
+const TEST_NOTIFICATION = false;
 
 
 admin.initializeApp();
