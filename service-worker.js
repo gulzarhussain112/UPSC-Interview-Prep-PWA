@@ -12,7 +12,6 @@ const ASSETS = [
   './app.js',
   './firebase-config.js',
   './firebase-client.js',
-  './firebase-messaging-sw.js',
   './manifest.json',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
