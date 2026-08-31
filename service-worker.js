@@ -1,13 +1,9 @@
-/*
-===========================================================
- UPSC INTERVIEW PREP PWA
- Single Service Worker
- - PWA caching
- - Firebase Cloud Messaging
-===========================================================
-*/
+/* =========================================================
+   UPSC INTERVIEW PREP — SERVICE WORKER
+   PWA CACHE + FCM WEB PUSH
+   ========================================================= */
 
-const CACHE = 'upsc-prep-v14.0.0';
+const CACHE = 'upsc-prep-v13.2.6';
 
 const ASSETS = [
   './',
@@ -17,6 +13,7 @@ const ASSETS = [
   './app.js',
   './firebase-config.js',
   './firebase-client.js',
+  './service-worker.js',
   './manifest.json',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
@@ -25,95 +22,214 @@ const ASSETS = [
 ];
 
 
-/*
-===========================================================
- FIREBASE MESSAGING
-===========================================================
-*/
+/* =========================================================
+   INSTALL
+   ========================================================= */
 
-importScripts(
-  'https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js'
-);
+self.addEventListener('install', event => {
 
-importScripts(
-  'https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js'
-);
+  console.log('[StudyPush SW] Installing');
 
+  event.waitUntil(
 
-firebase.initializeApp({
-  apiKey: "AIzaSyAiyANqQh7Lqs80oOuavU93nvEY2diaGag",
-  authDomain: "interview-prep-upsc.firebaseapp.com",
-  projectId: "interview-prep-upsc",
-  storageBucket: "interview-prep-upsc.firebasestorage.app",
-  messagingSenderId: "632920971695",
-  appId: "1:632920971695:web:1d3c90a1484fbe1c95b75a"
+    caches.open(CACHE)
+
+      .then(cache => cache.addAll(ASSETS))
+
+      .then(() => self.skipWaiting())
+
+  );
+
 });
 
 
-const messaging = firebase.messaging();
+/* =========================================================
+   ACTIVATE
+   ========================================================= */
 
+self.addEventListener('activate', event => {
 
-messaging.onBackgroundMessage(payload => {
+  console.log('[StudyPush SW] Activating');
 
-  console.log(
-    '[UPSC SW] Background FCM message:',
-    payload
+  event.waitUntil(
+
+    caches.keys()
+
+      .then(keys =>
+
+        Promise.all(
+
+          keys
+
+            .filter(key => key !== CACHE)
+
+            .map(key => caches.delete(key))
+
+        )
+
+      )
+
+      .then(() => self.clients.claim())
+
   );
+
+});
+
+
+/* =========================================================
+   FETCH
+   ========================================================= */
+
+self.addEventListener('fetch', event => {
+
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  event.respondWith(
+
+    caches.match(event.request)
+
+      .then(cached => {
+
+        if (cached) {
+          return cached;
+        }
+
+        return fetch(event.request)
+
+          .then(response => {
+
+            if (
+              !response ||
+              response.status !== 200 ||
+              response.type !== 'basic'
+            ) {
+              return response;
+            }
+
+            const copy = response.clone();
+
+            caches.open(CACHE)
+              .then(cache => {
+                cache.put(event.request, copy);
+              });
+
+            return response;
+
+          });
+
+      })
+
+  );
+
+});
+
+
+/* =========================================================
+   FCM / WEB PUSH
+   =========================================================
+
+   We deliberately DO NOT use importScripts() here.
+
+   Firebase's CDN script was causing the Service Worker
+   evaluation to fail before it could register.
+
+   Instead, receive the Web Push event directly.
+   ========================================================= */
+
+self.addEventListener('push', event => {
+
+  console.log('[StudyPush SW] Push received');
+
+  let data = {};
+
+  try {
+
+    if (event.data) {
+      data = event.data.json();
+    }
+
+  } catch (error) {
+
+    console.warn(
+      '[StudyPush SW] Could not parse push data',
+      error
+    );
+
+    try {
+
+      data = {
+        body: event.data
+          ? event.data.text()
+          : ''
+      };
+
+    } catch (_) {}
+
+  }
 
 
   const title =
-    payload.data?.title ||
-    payload.notification?.title ||
+    data?.data?.title ||
+    data?.notification?.title ||
+    data?.title ||
     'UPSC Study Reminder';
 
 
   const body =
-    payload.data?.body ||
-    payload.notification?.body ||
+    data?.data?.body ||
+    data?.notification?.body ||
+    data?.body ||
     'Your scheduled study session needs attention.';
 
 
   const sessionId =
-    payload.data?.sessionId ||
+    data?.data?.sessionId ||
+    data?.sessionId ||
     'upsc-study';
 
 
   const url =
-    payload.data?.url ||
+    data?.data?.url ||
+    data?.url ||
     './index.html';
 
 
-  self.registration.showNotification(
-    title,
-    {
-      body,
+  event.waitUntil(
 
-      icon:
-        './assets/icons/icon-192.png',
+    self.registration.showNotification(
 
-      badge:
-        './assets/icons/icon-192.png',
+      title,
 
-      tag:
-        sessionId,
+      {
 
-      renotify:
-        true,
+        body: body,
 
-      data: {
-        url
+        icon: './assets/icons/icon-192.png',
+
+        badge: './assets/icons/icon-192.png',
+
+        tag: sessionId,
+
+        renotify: true,
+
+        data: {
+          url: url
+        }
+
       }
-    }
+
+    )
+
   );
 
 });
 
 
-/*
-===========================================================
- NOTIFICATION CLICK
-===========================================================
-*/
+/* =========================================================
+   NOTIFICATION CLICK
+   ========================================================= */
 
 self.addEventListener(
   'notificationclick',
@@ -125,32 +241,31 @@ self.addEventListener(
     event.waitUntil(
 
       clients.matchAll({
+
         type: 'window',
+
         includeUncontrolled: true
+
       })
 
       .then(list => {
 
-        const target =
-          new URL(
-            event.notification.data?.url ||
-            './index.html',
-            self.location.origin
-          ).href;
+        const target = new URL(
+
+          event.notification.data?.url ||
+          './index.html',
+
+          self.location.origin
+
+        ).href;
 
 
-        /*
-        -----------------------------------------------
-        Existing UPSC tab/app
-        -----------------------------------------------
-        */
+        for (const client of list) {
 
-        for(const client of list){
-
-          if(
+          if (
             client.url === target &&
             'focus' in client
-          ){
+          ) {
 
             return client.focus();
 
@@ -159,17 +274,9 @@ self.addEventListener(
         }
 
 
-        /*
-        -----------------------------------------------
-        Any existing UPSC window
-        -----------------------------------------------
-        */
+        for (const client of list) {
 
-        for(const client of list){
-
-          if(
-            'focus' in client
-          ){
+          if ('focus' in client) {
 
             return client.focus();
 
@@ -177,153 +284,10 @@ self.addEventListener(
 
         }
 
-
-        /*
-        -----------------------------------------------
-        Open new window
-        -----------------------------------------------
-        */
 
         return clients.openWindow(target);
 
       })
-
-    );
-
-  }
-);
-
-
-/*
-===========================================================
- INSTALL
-===========================================================
-*/
-
-self.addEventListener(
-  'install',
-  event => {
-
-    console.log(
-      '[UPSC SW] Installing',
-      CACHE
-    );
-
-
-    event.waitUntil(
-
-      caches
-        .open(CACHE)
-
-        .then(cache => {
-
-          return cache.addAll(ASSETS);
-
-        })
-
-        .then(() => {
-
-          return self.skipWaiting();
-
-        })
-
-    );
-
-  }
-);
-
-
-/*
-===========================================================
- ACTIVATE
-===========================================================
-*/
-
-self.addEventListener(
-  'activate',
-  event => {
-
-    console.log(
-      '[UPSC SW] Activating',
-      CACHE
-    );
-
-
-    event.waitUntil(
-
-      caches
-        .keys()
-
-        .then(keys => {
-
-          return Promise.all(
-
-            keys
-
-              .filter(
-                key => key !== CACHE
-              )
-
-              .map(
-                key => caches.delete(key)
-              )
-
-          );
-
-        })
-
-        .then(() => {
-
-          return self.clients.claim();
-
-        })
-
-    );
-
-  }
-);
-
-
-/*
-===========================================================
- FETCH
-===========================================================
-*/
-
-self.addEventListener(
-  'fetch',
-  event => {
-
-    /*
-    Do not interfere with non-GET requests.
-    */
-
-    if(
-      event.request.method !== 'GET'
-    ){
-
-      return;
-
-    }
-
-
-    event.respondWith(
-
-      caches
-        .match(event.request)
-
-        .then(cached => {
-
-          if(cached){
-
-            return cached;
-
-          }
-
-
-          return fetch(event.request);
-
-        })
 
     );
 
